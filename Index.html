@@ -1,0 +1,232 @@
+<div id="app"></div>
+
+<style>
+body{
+margin:0;
+background:linear-gradient(180deg,#020617,#001a12,#020617);
+color:#e2e8f0;
+font-family:Arial;
+}
+
+#app{padding:10px}
+
+h2{
+text-align:center;
+color:#22c55e;
+}
+
+/* TOP BAR */
+.topbar{
+position:sticky;
+top:0;
+background:#020617;
+padding:10px;
+display:flex;
+flex-wrap:wrap;
+gap:6px;
+z-index:999;
+border-bottom:1px solid #111;
+}
+
+select{
+padding:8px;
+border-radius:6px;
+background:#111;
+color:#fff;
+border:none;
+}
+
+/* SECTION */
+.section{
+margin-top:15px;
+padding:12px;
+background:#0b0f1a;
+border-radius:12px;
+}
+
+/* GRID */
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+gap:8px;
+}
+
+.cell{
+background:#111;
+padding:8px;
+border-radius:8px;
+text-align:center;
+cursor:pointer;
+font-size:12px;
+transition:0.2s;
+}
+
+.cell:hover{
+transform:scale(1.05);
+}
+
+/* SIGNAL COLORS */
+.buy{
+box-shadow:0 0 12px #22c55e;
+}
+
+.sell{
+box-shadow:0 0 12px #ef4444;
+}
+
+/* ALERT */
+.alert{
+position:fixed;
+right:10px;
+padding:10px;
+background:#000;
+border-radius:8px;
+z-index:999;
+font-size:12px;
+}
+
+/* CHART */
+#chart{
+height:500px;
+}
+</style>
+
+<h2>🚀 RO’LYFE TERMINAL PRO</h2>
+
+<div class="topbar">
+<select id="symbol"></select>
+
+<select id="mode">
+<option value="live">LIVE</option>
+<option value="sniper">SNIPER</option>
+</select>
+</div>
+
+<div class="section">
+<div id="chart"></div>
+</div>
+
+<div class="section">
+<h3>🔥 Live Watchlist</h3>
+<div id="watch" class="grid"></div>
+</div>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+
+// 🔑 YOUR LIVE KEY
+const API_KEY = "d6i5c5pr01ql9cif0n8gd6i5c5pr01ql9cif0n90";
+
+let watchlist = [
+"AAPL","TSLA","NVDA","SPY","QQQ",
+"MSFT","AMZN","META","GOOGL",
+"AMD","PLTR","COIN"
+];
+
+let symbol = "AAPL";
+
+window.onload = ()=>{
+let sel=document.getElementById("symbol");
+watchlist.forEach(s=>{
+let o=document.createElement("option");
+o.value=s;o.text=s;
+sel.appendChild(o);
+});
+loadChart();
+loop();
+};
+
+/* CHART */
+function loadChart(){
+document.getElementById("chart").innerHTML="";
+new TradingView.widget({
+container_id:"chart",
+symbol:symbol,
+interval:"15",
+theme:"dark",
+studies:[
+"RSI@tv-basicstudies",
+"MACD@tv-basicstudies"
+]
+});
+}
+
+/* REAL DATA FETCH */
+async function getData(sym){
+try{
+let res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${API_KEY}`);
+return await res.json();
+}catch(e){
+return null;
+}
+}
+
+/* SIGNAL ENGINE */
+function computeSignal(data){
+if(!data || !data.dp) return "WAIT";
+
+let change = data.dp;
+let mode = document.getElementById("mode").value;
+
+if(mode==="sniper"){
+if(change > 1.2) return "BUY";
+if(change < -1.2) return "SELL";
+}else{
+if(change > 0.4) return "BUY";
+if(change < -0.4) return "SELL";
+}
+
+return "WAIT";
+}
+
+/* ALERT */
+function fireAlert(sym,act,price){
+let d=document.createElement("div");
+d.className="alert";
+d.style.top=(60+document.querySelectorAll(".alert").length*50)+"px";
+d.style.color=act==="BUY"?"#22c55e":"#ef4444";
+d.innerText=`${act} ${sym} @ ${price}`;
+document.body.appendChild(d);
+setTimeout(()=>d.remove(),3500);
+}
+
+/* RENDER */
+async function render(){
+let container=document.getElementById("watch");
+container.innerHTML="";
+
+for(let sym of watchlist){
+
+let data = await getData(sym);
+
+let price = data?.c || "-";
+let action = computeSignal(data);
+
+let div=document.createElement("div");
+div.className="cell "+(action==="BUY"?"buy":action==="SELL"?"sell":"");
+
+div.innerText = `${sym}
+$${price}
+${action}`;
+
+div.onclick=()=>{
+symbol=sym;
+loadChart();
+};
+
+container.appendChild(div);
+
+if(action!=="WAIT"){
+fireAlert(sym,action,price);
+}
+}
+}
+
+/* LOOP (SAFE RATE) */
+function loop(){
+render();
+setTimeout(loop,20000); // avoid API limits
+}
+
+</script>
