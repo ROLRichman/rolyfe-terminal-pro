@@ -86,9 +86,15 @@ font-size:12px;
 }
 
 /* CHART */
-#chart{
-height:500px;
-}
+#chart{height:500px}
+.data-safety{border:1px solid #8a6a32;background:#241e12;color:#f8e6bc;padding:12px;border-radius:10px;margin:12px 0;font-size:13px;line-height:1.5}
+.tv-news-panel{margin-top:14px;padding:12px;background:#0b0f1a;border:1px solid #263b4d;border-radius:12px}
+.tv-news-panel summary{cursor:pointer;font-weight:800;color:#8df0c1}
+.tv-news-widget{min-height:520px;width:100%;margin-top:12px}
+.tv-news-widget .tradingview-widget-container__widget{min-height:520px}
+.tv-news-attribution{font-size:11px;color:#9fb3c7;padding-top:8px}
+.tv-news-attribution a{color:#80c7ff}
+
 </style>
 
 <h2>🚀 RO’LYFE TERMINAL PRO</h2>
@@ -102,9 +108,18 @@ height:500px;
 </select>
 </div>
 
+<div class="data-safety"><b>DATA CONNECTOR NOT ACTIVE.</b> The exposed browser API key has been removed. Live BUY/SELL alerts stay disabled until a secure server-side quote feed is connected and verified.</div>
 <div class="section">
 <div id="chart"></div>
 </div>
+<details class="tv-news-panel" id="tradingViewNewsPanel" open>
+<summary>📰 TradingView Top Stories · Market News</summary>
+<div class="tradingview-widget-container tv-news-widget">
+  <div class="tradingview-widget-container__widget"></div>
+  <div class="tv-news-attribution"><a href="https://www.tradingview.com/news/" target="_blank" rel="noopener">TradingView News</a></div>
+  <script type="application/json" class="tv-news-widget-config">{"feedMode":"all_symbols","isTransparent":true,"displayMode":"regular","width":"100%","height":520,"colorTheme":"dark","locale":"en"}</script>
+</div>
+</details>
 
 <div class="section">
 <h3>🔥 Live Watchlist</h3>
@@ -115,8 +130,7 @@ height:500px;
 
 <script>
 
-// 🔑 YOUR LIVE KEY
-const API_KEY = "d6i5c5pr01ql9cif0n8gd6i5c5pr01ql9cif0n90";
+// Live provider key removed from browser code. Connect through a server-side market-data adapter before enabling signals.
 
 let watchlist = [
 "AAPL","TSLA","NVDA","SPY","QQQ",
@@ -134,7 +148,7 @@ o.value=s;o.text=s;
 sel.appendChild(o);
 });
 loadChart();
-loop();
+render();
 };
 
 /* CHART */
@@ -152,32 +166,17 @@ studies:[
 });
 }
 
-/* REAL DATA FETCH */
-async function getData(sym){
-try{
-let res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${API_KEY}`);
-return await res.json();
-}catch(e){
-return null;
-}
-}
+/* SECURE DATA GATE
+   No provider key is stored in this page. Until a server-side data adapter
+   is connected and its responses are verified, this terminal does not
+   generate directional alerts from stale, sample, or unavailable data.
+*/
+async function getData(_sym){return null;}
 
-/* SIGNAL ENGINE */
+/* SIGNAL ENGINE · FAIL CLOSED */
 function computeSignal(data){
-if(!data || !data.dp) return "WAIT";
-
-let change = data.dp;
-let mode = document.getElementById("mode").value;
-
-if(mode==="sniper"){
-if(change > 1.2) return "BUY";
-if(change < -1.2) return "SELL";
-}else{
-if(change > 0.4) return "BUY";
-if(change < -0.4) return "SELL";
-}
-
-return "WAIT";
+if(!data || !Number.isFinite(Number(data.dp))) return "WAIT";
+return "WAIT"; // Re-enable only after a verified provider response is wired.
 }
 
 /* ALERT */
@@ -226,9 +225,25 @@ fireAlert(sym,action,price);
 /* LOOP (SAFE RATE) */
 function loop(){
 render();
-setTimeout(loop,20000); // avoid API limits
+setTimeout(loop,20000); // retained only for future server-side data refresh
 }
 
 </script>
-
+<script>(() => {
+ const panel=document.getElementById("tradingViewNewsPanel");
+ if(!panel)return;
+ let loaded=false;
+ const load=()=>{
+  if(loaded)return;
+  const configNode=panel.querySelector(".tv-news-widget-config");
+  const container=panel.querySelector(".tv-news-widget");
+  if(!configNode||!container)return;
+  let config;try{config=JSON.parse(configNode.textContent||"{}");}catch(_){return;}
+  const script=document.createElement("script");
+  script.src="https://s3.tradingview.com/external-embedding/embed-widget-timeline.js";
+  script.async=true;script.textContent=JSON.stringify(config);container.appendChild(script);loaded=true;
+ };
+ if(panel.open)load();
+ panel.addEventListener("toggle",()=>{if(panel.open)load();});
+})();</script>
 <script src="https://rolrichman.github.io/rolyfe-personal-trading-desk/shared/rolyfe-global-tools.js?v=20261115-5" defer></script>
